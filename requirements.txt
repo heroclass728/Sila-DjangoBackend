@@ -1,0 +1,12 @@
+djongo
+dnspython
+djangorestframework
+markdown
+django-filter
+django-rest-auth
+django-allauth
+neomodel
+pandas
+
+
+django_extensions
