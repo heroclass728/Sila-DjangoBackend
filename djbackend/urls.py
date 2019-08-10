@@ -15,6 +15,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path,include
+from django_ses.views import handle_bounce
+from django.views.decorators.csrf import csrf_exempt
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -23,4 +26,6 @@ urlpatterns = [
     path('users/', include('users.urls')), # new user app with custom model
     path('users/', include('django.contrib.auth.urls')),
     path('pages/', include('pages.urls')),
+    path('ses/bounce/', csrf_exempt(handle_bounce)),
+    path('admin/django-ses/',include('django_ses.urls')),
 ]

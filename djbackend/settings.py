@@ -129,9 +129,9 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
-#CORS_ORIGIN_ALLOW_ALL = True
-#CORS_ALLOW_CREDENTIALS = True
-#CSRF_TRUSTED_ORIGINS = ['api.drsila.com']
+CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = ['api.drsila.com']
 
 # Internationalization
 # https://docs.djangoproject.com/en/2.2/topics/i18n/
@@ -167,7 +167,7 @@ ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_CONFIRM_EMAIL_ON_GET = True
 ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
-ACCOUNT_EMAIL_VERIFICATION = 'optional' #"mandatory"'optional'
+ACCOUNT_EMAIL_VERIFICATION = 'none' #"mandatory"'optional'
 ACCOUNT_EMAIL_CONFIRMATION_HMAC =False
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
