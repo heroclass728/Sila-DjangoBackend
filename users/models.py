@@ -10,4 +10,8 @@ class CustomUser(AbstractUser):
     def __str__(self):
         return self.email
     # add additional fields in here
-    
+
+
+class custom_verification_code(models.Model):
+    email = models.EmailField(max_length=70,blank=True, null= True, unique= True)
+    code = models.IntegerField(null= False, unique= True)
