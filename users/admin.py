@@ -9,7 +9,7 @@ from django.contrib.auth.admin import UserAdmin
 from .forms import CustomUserCreationForm, CustomUserChangeForm
 from .models import CustomUser
 from .models import custom_verification_code as cvc
-
+from .models import user_data,profile_data
 
 class CustomUserAdmin(UserAdmin):
     model = CustomUser
@@ -19,3 +19,5 @@ class CustomUserAdmin(UserAdmin):
 
 admin.site.register(CustomUser, CustomUserAdmin)
 admin.site.register(cvc)
+admin.site.register(profile_data)
+admin.site.register(user_data)

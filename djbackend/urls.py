@@ -29,3 +29,8 @@ urlpatterns = [
     path('ses/bounce/', csrf_exempt(handle_bounce)),
     path('admin/django-ses/',include('django_ses.urls')),
 ]
+
+
+admin.site.site_header = "Dr.Sila"
+admin.site.site_title = "Dcatra"
+admin.site.index_title = "Dr.sila App Admin"

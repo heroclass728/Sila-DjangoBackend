@@ -5,6 +5,7 @@ from django.contrib.auth.models import AbstractUser
 # from django.db import models
 
 class CustomUser(AbstractUser):
+#    username = models.CharField(max_length=100, blank=False,unique=False,null=False)
     pass
 
     def __str__(self):
@@ -23,9 +24,12 @@ class user_data(models.Model):
     age = models.IntegerField(null=True)
     email = models.EmailField(max_length=70,blank=True, null=True, unique=True)
     gender = models.CharField(max_length=10,null=False)
-    account_key = models.ForeignKey(CustomUser)
+    account_key = models.ForeignKey(CustomUser,on_delete=models.PROTECT)
 
 class profile_data(models.Model):
-    account_key  = models.ForeignKey(CustomUser)
+    account_key  = models.ForeignKey(CustomUser,on_delete=models.PROTECT)
     subscription = models.IntegerField(default=0)
     reports      = models.IntegerField(default=0)
+
+
+
