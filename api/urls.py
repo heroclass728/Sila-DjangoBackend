@@ -10,6 +10,7 @@ urlpatterns = [
     path('neo/', include('neo.urls')),
     path('rest-auth/registration/', include('rest_auth.registration.urls')),
     path('activate_user/', views.useractivate),
-    path('resend_activation/', views.resend_activation)
+    path('resend_activation/', views.resend_activation),
+    path('emailcheck/', views.emailcheck)
 #     path('rest-auth/github/connect/$', GithubConnect.as_view(), name='github_connect')
 ]

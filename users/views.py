@@ -40,6 +40,18 @@ class UserListView(generics.ListCreateAPIView):
     queryset = models.CustomUser.objects.all()
     serializer_class = serializers.UserSerializer
 
+#email checkup
+def emailcheck(request):
+    try:
+        email = request.GET['email']
+    except:
+        return JsonResponse({"message":"Required Details are not provided"}, status=400)
+    if user.objects.filter(email=email).count():
+        return JsonResponse({"message":"Email is alredy registered"}, status=403)
+    else:
+        return JsonResponse({"message":"Email is Not Registered"})
+#    serializer_class = serializers.UserSerializer
+
 
 #send mail
 @receiver(user_signed_up)

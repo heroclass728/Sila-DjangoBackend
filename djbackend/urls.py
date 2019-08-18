@@ -28,6 +28,7 @@ urlpatterns = [
     path('pages/', include('pages.urls')),
     path('ses/bounce/', csrf_exempt(handle_bounce)),
     path('admin/django-ses/',include('django_ses.urls')),
+    path('tinymce/', include('tinymce.urls')),
 ]
 
 
