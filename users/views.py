@@ -1,3 +1,5 @@
+from rest_framework.views import APIView
+from rest_framework import authentication, permissions
 from django.shortcuts import render
 from django.http import HttpResponse
 # Create your views here.
@@ -18,16 +20,18 @@ from django.core.mail import send_mail
 from users.models import custom_verification_code as cvc
 from random import randint
 from users.models import CustomUser as user
-from users.models import user_data,profile_data
+from users.models import user_data
+from rest_framework import viewsets
 
 #email
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
 
-
+from rest_framework.permissions import IsAuthenticated
 from .forms import CustomUserCreationForm
 from django.http import JsonResponse
+import json
 
 
 class SignUp(CreateView):
@@ -39,6 +43,49 @@ class SignUp(CreateView):
 class UserListView(generics.ListCreateAPIView):
     queryset = models.CustomUser.objects.all()
     serializer_class = serializers.UserSerializer
+
+class profile_data(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = models.user_data.objects.all()
+    serializer_class = serializers.userdataser
+
+
+class user_profile(APIView):
+    authentication_classes = [authentication.TokenAuthentication]
+#    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user = request.user
+        profiles = models.user_data.objects.filter(account_key = user.id)
+        plist = []
+        for i in profiles:
+            if i.account_type == 0:
+                plist.append({'profile':'primary','id':i.id,'name':i.name,'age':i.age,'email':i.email,'gender':i.gender})
+            else:
+                plist.append({'profile':'subuser','id':i.id,'name':i.name,'age':i.age,'email':i.email,'gender':i.gender})
+        return  JsonResponse(plist, safe=False)
+
+    def post(self, request, format=None):
+        luser = request.user
+        jdata =json.loads(request.body)
+        cuser = models.CustomUser.objects.get(email=luser.email) 
+        if not all(elm in list(jdata.keys()) for elm in ['name','age','gender','pregnancy']):
+            return JsonResponse({"message":"Not all required variables are provided"}, status=400)
+        if models.user_data.objects.filter(account_key=cuser.id).count():
+            record = models.user_data(account_type=0,name = jdata['name'],age = jdata['age'],gender = jdata['gender'],pregnancy = jdata['pregnancy'],account_key=cuser.id)
+            record(email=user.email)
+            record.save()
+            message = 'primary profile successfully created'
+        else:
+            record = models.user_data(account_type=1,name = jdata['name'],age = jdata['age'],gender = jdata['gender'],pregnancy = jdata['pregnancy'],account_key=cuser.id)
+            if 'email' in jdata.keys():
+                record(email=request.POST['email'])
+            record.save()
+            message = 'subuser profile is successfully created'
+        return  JsonResponse({'message':mssage,'profile_id':record.id}, safe=False)
+
+
 
 #email checkup
 def emailcheck(request):

@@ -1,11 +1,12 @@
 from django.db import models
-
-# Create your models here.
+from djmoney.models.fields import MoneyField
 from django.contrib.auth.models import AbstractUser
 # from django.db import models
 
 class CustomUser(AbstractUser):
 #    username = models.CharField(max_length=100, blank=False,unique=False,null=False)
+#    subscription = models.ForeignKey(subscriptions,null=False,default=1)
+#    report_count = models.IntegerField(null=False,default=0)
     pass
 
     def __str__(self):
@@ -21,15 +22,25 @@ class custom_verification_code(models.Model):
 class user_data(models.Model):
     account_type = models.IntegerField(null=False)
     name = models.CharField(max_length=40,null=False)
-    age = models.IntegerField(null=True)
+    age = models.IntegerField(null=False,blank=False)
     email = models.EmailField(max_length=70,blank=True, null=True, unique=True)
-    gender = models.CharField(max_length=10,null=False)
+    gender = models.CharField(max_length=10,null=False,blank=False)
+    pregnancy = models.BooleanField(null=False,blank=False)
+    report_count = models.IntegerField(null=True,default=0)
     account_key = models.ForeignKey(CustomUser,on_delete=models.PROTECT)
 
-class profile_data(models.Model):
-    account_key  = models.ForeignKey(CustomUser,on_delete=models.PROTECT)
-    subscription = models.IntegerField(default=0)
-    reports      = models.IntegerField(default=0)
+
+#class profile_data(models.Model):
+#    account_key  = models.ForeignKey(CustomUser,on_delete=models.PROTECT)
+#    subscription = models.IntegerField(default=0)
+#    reports      = models.IntegerField(default=0)
 
 
-
+class subscriptions(models.Model):
+    name = models.CharField(max_length=40,null=False,unique=True,blank=True)
+    description = models.TextField()
+    price = MoneyField(max_digits=14, decimal_places=2)
+    report_count = models.IntegerField(blank=False,null=False)
+    active = models.BooleanField(default=True)
+    def __str__(self):
+        return self.name
