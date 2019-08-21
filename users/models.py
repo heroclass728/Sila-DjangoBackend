@@ -1,7 +1,9 @@
 from django.db import models
 from djmoney.models.fields import MoneyField
 from django.contrib.auth.models import AbstractUser
+from django.contrib.auth import get_user_model
 # from django.db import models
+from django.conf import settings
 
 class CustomUser(AbstractUser):
 #    username = models.CharField(max_length=100, blank=False,unique=False,null=False)
@@ -23,13 +25,12 @@ class user_data(models.Model):
     account_type = models.IntegerField(null=False)
     name = models.CharField(max_length=40,null=False)
     age = models.IntegerField(null=False,blank=False)
-    email = models.EmailField(max_length=70,blank=True, null=True, unique=True)
+    email = models.EmailField(max_length=70,blank=True, null=True)
     gender = models.CharField(max_length=10,null=False,blank=False)
     pregnancy = models.BooleanField(null=False,blank=False)
     report_count = models.IntegerField(null=True,default=0)
-    account_key = models.ForeignKey(CustomUser,on_delete=models.PROTECT)
-
-
+    account_id = models.IntegerField(null=False,blank=False)
+    active = models.BooleanField(null=False,default=True)
 #class profile_data(models.Model):
 #    account_key  = models.ForeignKey(CustomUser,on_delete=models.PROTECT)
 #    subscription = models.IntegerField(default=0)

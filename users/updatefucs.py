@@ -20,4 +20,4 @@ class GetUserDetails(APIView):
         """
 #        usernames = [user.username for user in User.objects.all()]
         user = request.user
-        return Response({ 'username': user.username,'email': user.email })
+        return Response({ 'username': user.username,'email': user.email ,'account_id':user.id})

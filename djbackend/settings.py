@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'django_ses',
     'tinymce',
     'e_mails',
+    'coupons',
 ]
 
 # SITE_ID = 1 

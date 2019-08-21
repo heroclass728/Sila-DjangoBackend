@@ -57,35 +57,90 @@ class user_profile(APIView):
 
     def get(self, request, format=None):
         user = request.user
-        profiles = models.user_data.objects.filter(account_key = user.id)
+        pid = request.GET.get("profile_id")
+        if pid is not None:
+            try:
+                i = models.user_data.objects.get(id = pid,active=True)
+            except:
+                return JsonResponse({"message":"Invalid profile id"}, status=400)
+            if i.account_id != user.id:
+                return JsonResponse({"message":"Current user cannot access this profile"}, status=400)
+            type = ''
+            if i.account_type==0:
+                type = 'primary'
+            if i.account_type==1:
+                type = 'subuser'
+            return JsonResponse({'profile':type,'id':i.id,'name':i.name,'age':i.age,'email':i.email,'gender':i.gender})
+
+        profiles = models.user_data.objects.filter(account_id = user.id,active=True)
         plist = []
         for i in profiles:
             if i.account_type == 0:
-                plist.append({'profile':'primary','id':i.id,'name':i.name,'age':i.age,'email':i.email,'gender':i.gender})
+                plist.append({'profile':'primary','id':i.id,'name':i.name,'age':i.age,'email':i.email,'gender':i.gender,'acount_id':user.id})
             else:
                 plist.append({'profile':'subuser','id':i.id,'name':i.name,'age':i.age,'email':i.email,'gender':i.gender})
         return  JsonResponse(plist, safe=False)
 
     def post(self, request, format=None):
-        luser = request.user
+        user = request.user
         jdata =json.loads(request.body)
-        cuser = models.CustomUser.objects.get(email=luser.email) 
-        if not all(elm in list(jdata.keys()) for elm in ['name','age','gender','pregnancy']):
+        if not all(elm in list(jdata.keys()) for elm in ['name','age','gender','pregnancy','primary']):
             return JsonResponse({"message":"Not all required variables are provided"}, status=400)
-        if models.user_data.objects.filter(account_key=cuser.id).count():
-            record = models.user_data(account_type=0,name = jdata['name'],age = jdata['age'],gender = jdata['gender'],pregnancy = jdata['pregnancy'],account_key=cuser.id)
-            record(email=user.email)
+        if jdata['primary']==True: #not models.user_data.objects.filter(account_id=user.id).count():
+            if models.user_data.objects.filter(account_id=user.id,account_type=0).count():
+               return JsonResponse({"message":"user already has a primary profile"}, status=400)    
+            record = models.user_data.objects.create(account_type=0,name = jdata['name'],age = jdata['age'],gender = jdata['gender'],pregnancy = jdata['pregnancy'],account_id=user.id)
+            record.email=user.email
             record.save()
             message = 'primary profile successfully created'
         else:
-            record = models.user_data(account_type=1,name = jdata['name'],age = jdata['age'],gender = jdata['gender'],pregnancy = jdata['pregnancy'],account_key=cuser.id)
+            record = models.user_data.objects.create(account_type=1,name = jdata['name'],age = jdata['age'],gender = jdata['gender'],pregnancy = jdata['pregnancy'],account_id=user.id)
             if 'email' in jdata.keys():
-                record(email=request.POST['email'])
-            record.save()
+                record.email=jdata['email']
+                record.save()
             message = 'subuser profile is successfully created'
-        return  JsonResponse({'message':mssage,'profile_id':record.id}, safe=False)
+        return  JsonResponse({'message':message,'profile_id':record.id}, safe=False)
+
+    def patch(self, request, format=None):
+        user = request.user
+        jdata =json.loads(request.body)
+        pid = request.GET.get("profile_id")
+        if pid is None:
+            return JsonResponse({"message":"Profile id not provided"}, status=400)
+        try:
+            i = models.user_data.objects.get(id = pid)
+        except:
+            return JsonResponse({"message":"Invalid profile id"}, status=400)
+        if i.account_id != user.id:
+            return JsonResponse({"message":"Current user cannot access this profile"}, status=400)
+        if not all(elm in list(jdata.keys()) for elm in ['name','age','gender','pregnancy']):
+            return JsonResponse({"message":"Not all required variables are provided"}, status=400)
+        i.name = jdata['name']
+        i.age = jdata['age']
+        i.gender = jdata['gender']
+        i.pregnancy = jdata['pregnancy']
+        if 'email' in jdata.keys():
+            i.email = jdata['email']
+        i.save() 
+        return  JsonResponse({"message":"Details updated successfully"})
 
 
+    def delete(self, request, format=None):
+        user = request.user
+        pid = request.GET.get("profile_id")
+        if pid is None:
+            return JsonResponse({"message":"Profile id not provided"}, status=400)
+        try:
+            i = models.user_data.objects.get(id = pid)
+        except:
+            return JsonResponse({"message":"Invalid profile id"}, status=400)
+        if i.account_id != user.id:
+            return JsonResponse({"message":"Current user cannot access this profile"}, status=400)
+        if i.account_type == 0:
+            return JsonResponse({"message":"Primary profile cannot be deleted"}, status=400)
+        i.active = False
+        i.save()
+        return JsonResponse({"message":"Successfully deleted the user profile"}) 
 
 #email checkup
 def emailcheck(request):
@@ -94,7 +149,8 @@ def emailcheck(request):
     except:
         return JsonResponse({"message":"Required Details are not provided"}, status=400)
     if user.objects.filter(email=email).count():
-        return JsonResponse({"message":"Email is alredy registered"}, status=403)
+        i = user.objects.get(email=email)
+        return JsonResponse({"message":"Email is alredy registered","account_id":i.id}, status=403)
     else:
         return JsonResponse({"message":"Email is Not Registered"})
 #    serializer_class = serializers.UserSerializer
@@ -144,7 +200,7 @@ def useractivate(request):
         rr = user.objects.get(email=email)
         rr.is_active = True
         rr.save()
-        return JsonResponse({"message":"user activated"})
+        return JsonResponse({"message":"user activated","account_id":rr.id})
     else:
         return JsonResponse({"message":"Code incorrect"}, status=403)
 
