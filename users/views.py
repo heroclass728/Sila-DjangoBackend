@@ -34,6 +34,9 @@ from django.http import JsonResponse
 import json
 
 
+from datetime import date
+#from django.core import serializers
+
 class SignUp(CreateView):
     form_class = CustomUserCreationForm
     success_url = reverse_lazy('login')
@@ -63,40 +66,47 @@ class user_profile(APIView):
                 i = models.user_data.objects.get(id = pid,active=True)
             except:
                 return JsonResponse({"message":"Invalid profile id"}, status=400)
-            if i.account_id != user.id:
+            if i.account_id != user:
                 return JsonResponse({"message":"Current user cannot access this profile"}, status=400)
             type = ''
             if i.account_type==0:
                 type = 'primary'
             if i.account_type==1:
                 type = 'subuser'
-            return JsonResponse({'profile':type,'id':i.id,'name':i.name,'age':i.age,'email':i.email,'gender':i.gender})
+            return JsonResponse({'profile':type,'id':i.id,'name':i.name,'dob':i.dob,'email':i.email,'gender':i.gender,'pregnancy':i.pregnancy,'relation':i.relation})
 
-        profiles = models.user_data.objects.filter(account_id = user.id,active=True)
+        profiles = models.user_data.objects.filter(account_id = user,active=True)
         plist = []
         for i in profiles:
             if i.account_type == 0:
-                plist.append({'profile':'primary','id':i.id,'name':i.name,'age':i.age,'email':i.email,'gender':i.gender,'acount_id':user.id})
+                plist.append({'profile':'primary','id':i.id,'name':i.name,'dob':i.dob,'email':i.email,'gender':i.gender,'pregnancy':i.pregnancy,'relation':i.relation,'acount_id':user.id})
             else:
-                plist.append({'profile':'subuser','id':i.id,'name':i.name,'age':i.age,'email':i.email,'gender':i.gender})
+                plist.append({'profile':'subuser','id':i.id,'name':i.name,'dob':i.dob,'email':i.email,'gender':i.gender,'pregnancy':i.pregnancy,'relation':i.relation})
         return  JsonResponse(plist, safe=False)
 
     def post(self, request, format=None):
         user = request.user
         jdata =json.loads(request.body)
-        if not all(elm in list(jdata.keys()) for elm in ['name','age','gender','pregnancy','primary']):
+        if models.user_data.objects.filter(account_id=user).count() >= models.account_data.objects.get(user=user).subusers_allowed:
+            return JsonResponse({"message":"Your limit of subusers has reached based on your plan"}, status=400)
+        if not all(elm in list(jdata.keys()) for elm in ['name','dob','gender','pregnancy','primary']):
             return JsonResponse({"message":"Not all required variables are provided"}, status=400)
         if jdata['primary']==True: #not models.user_data.objects.filter(account_id=user.id).count():
-            if models.user_data.objects.filter(account_id=user.id,account_type=0).count():
+            if models.user_data.objects.filter(account_id=user,account_type=0).count():
                return JsonResponse({"message":"user already has a primary profile"}, status=400)    
-            record = models.user_data.objects.create(account_type=0,name = jdata['name'],age = jdata['age'],gender = jdata['gender'],pregnancy = jdata['pregnancy'],account_id=user.id)
+            record = models.user_data.objects.create(account_type=0,name = jdata['name'],dob = jdata['dob'],gender = jdata['gender'],pregnancy = jdata['pregnancy'],account_id=user)
             record.email=user.email
+            if 'relation' in jdata.keys():
+                record.relation=jdata['relation']
             record.save()
             message = 'primary profile successfully created'
         else:
-            record = models.user_data.objects.create(account_type=1,name = jdata['name'],age = jdata['age'],gender = jdata['gender'],pregnancy = jdata['pregnancy'],account_id=user.id)
+            record = models.user_data.objects.create(account_type=1,name = jdata['name'],dob = jdata['dob'],gender = jdata['gender'],pregnancy = jdata['pregnancy'],account_id=user)
             if 'email' in jdata.keys():
                 record.email=jdata['email']
+                record.save()
+            if 'relation' in jdata.keys():
+                record.relation=jdata['relation']
                 record.save()
             message = 'subuser profile is successfully created'
         return  JsonResponse({'message':message,'profile_id':record.id}, safe=False)
@@ -111,16 +121,18 @@ class user_profile(APIView):
             i = models.user_data.objects.get(id = pid)
         except:
             return JsonResponse({"message":"Invalid profile id"}, status=400)
-        if i.account_id != user.id:
+        if i.account_id != user:
             return JsonResponse({"message":"Current user cannot access this profile"}, status=400)
-        if not all(elm in list(jdata.keys()) for elm in ['name','age','gender','pregnancy']):
+        if not all(elm in list(jdata.keys()) for elm in ['name','dob','gender','pregnancy']):
             return JsonResponse({"message":"Not all required variables are provided"}, status=400)
         i.name = jdata['name']
-        i.age = jdata['age']
+        i.dob = jdata['dob']
         i.gender = jdata['gender']
         i.pregnancy = jdata['pregnancy']
         if 'email' in jdata.keys():
             i.email = jdata['email']
+        if 'relation' in jdata.keys():
+            i.relation = jdata['relation']
         i.save() 
         return  JsonResponse({"message":"Details updated successfully"})
 
@@ -134,7 +146,7 @@ class user_profile(APIView):
             i = models.user_data.objects.get(id = pid)
         except:
             return JsonResponse({"message":"Invalid profile id"}, status=400)
-        if i.account_id != user.id:
+        if i.account_id != user:
             return JsonResponse({"message":"Current user cannot access this profile"}, status=400)
         if i.account_type == 0:
             return JsonResponse({"message":"Primary profile cannot be deleted"}, status=400)
@@ -150,7 +162,7 @@ def emailcheck(request):
         return JsonResponse({"message":"Required Details are not provided"}, status=400)
     if user.objects.filter(email=email).count():
         i = user.objects.get(email=email)
-        return JsonResponse({"message":"Email is alredy registered","account_id":i.id}, status=403)
+        return JsonResponse({"message":"Email is already registered","account_id":i.id}, status=403)
     else:
         return JsonResponse({"message":"Email is Not Registered"})
 #    serializer_class = serializers.UserSerializer
@@ -162,11 +174,16 @@ def send_code(sender, **kwargs):
     # username = kwargs['request'].user.username
     email = kwargs['user'].email
     username = kwargs['user'].username
+#    firstname = kwargs['user'].firtst
+#    kkk = user.objects.get(email=email)
+#    models.account_data.objects.create(user=kkk)
     code = randint(100000, 999999)
     while cvc.objects.filter(code=code).exists():
         code = code + 1
     record = cvc(email=email,code=code)
     rr = user.objects.get(email=email)
+    models.account_data.objects.create(user=rr)
+    
     rr.is_active = False
     record.save()
     rr.save()
@@ -228,3 +245,69 @@ def resend_activation(request):
         return JsonResponse({"message":"Verification code resent successfully"})
     except:
         return JsonResponse({"message":"Something Went wrong"}, status=403)
+
+
+
+class coupon_redeem(APIView):
+    authentication_classes = [authentication.TokenAuthentication]
+#    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        user = request.user
+        edit_profile = EditProfileForm(user=user)
+        redeem = CouponForm()
+        if request.method == 'POST':
+            edit_profile = EditProfileForm(request.POST, user=user)
+            redeem = CouponForm(request.POST, user=user)
+            if redeem.is_valid():
+                coupon = redeem.coupon
+                coupon.redeem(request.user)
+            else:
+                pass
+            return render(request, 'main/profile.html', {'edit_profile': edit_profile, 'redeem': redeem})
+
+        return render(request, 'main/profile.html', {'edit_profile': edit_profile, 'redeem': redeem})
+    
+class plan_update(APIView):
+#    authentication_classes = [authentication.TokenAuthentication]
+#    permission_classes = [permissions.IsAdminUser]
+#    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        data = json.load(request.body)
+        if not all(elm in list(data.keys()) for elm in ['plan_id','user_id']):
+            return JsonResponse({"message":"required details are not provided not provided"}, status=400)
+        try:
+            i = models.subscription_plans.objects.get(id = data['plan_is'])
+        except:
+            return JsonResponse({"message":"Invalid plan id"}, status=400)
+        user = user.objects.get(id=data['user_id'])
+        adata = models.account_data.objects.get(user=user)
+        adata.reports_allowed =i.allowed_reports
+        adata.report_check =i.infinate_reports
+        adata.subusers_allowed=i.allowed_subusers
+        adata.subuser_check=i.infinate_subusers
+        enddate = date + timedelta(days=i.extension_days)
+        startdate = date.today
+        adata.save()
+        return JsonResponse({"message":"Plan updated successfully"})
+    def get(self, request):
+        data = models.subscription_plans.objects.filter(active=True)
+        plans = []
+        for i in data:
+            plan = {}
+            plan['days'] = None
+            plan['reports_allowed'] = None
+            plan['profiles_allowed'] = None
+            plan['id'] = i.id
+            if not i.infinate_reports:
+                plan['reports_allowed']= i.allowed_reports
+            if not i.infinate_days:
+                plan['days'] = i.extension_days
+            if not i.infinate_subusers:
+                plan['profiles_allowed'] = i.allowed_subusers
+            plan['description']=i.description
+            plans.append(plan)
+        return JsonResponse({"plans":plans})
+ 
+

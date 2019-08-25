@@ -7,4 +7,5 @@ urlpatterns = [
     path('usersview/', views.UserListView.as_view()),
     path('current/', GetUserDetails.as_view()),
     path('profile_data/', views.user_profile.as_view()),
+    path('plan/', views.plan_update.as_view()),
 ]

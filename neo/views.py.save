@@ -192,47 +192,95 @@ def makesymsearch(request):
     with open('enlist.pkl', 'wb') as f:
         pickle.dump(enlist, f, pickle.HIGHEST_PROTOCOL)
     with open('arlist.pkl', 'wb') as f:
-        pickle.dump(arlist, f, pickle.HIGHEST_PROTOCOL)
-    return HttpResponse('Successfully updated symptom serach')
-
-
-class getreport(APIView):
-    authentication_classes = [authentication.TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-    def getdiseasesdata(diseases,ar):
-        if ar:
-            result, meta = db.cypher_query('match (s:Disease) where s.ar_name in $dislist return s.ar_name,s.ar_description',{'symlist':li})
+        pickle.dump(arlist, f, pickle.Helse:
+            results, meta = db.cypher_query(self.makequery(data['symtomps']),params)
+        if 'skip' in  data.keys():
+            nextsyms,disprobs,symlist = self.getprobs(results,skip=data['skip'])
         else:
-            result, meta = db.cypher_query('match (s:Disease) where s.name in $dislist return s.name,s.description',{'symlist':li})
-        return result
-    def post(self, request):
-        user = request.user
-        data = json.load(request.body)
-        if not all(elm in list(data.keys()) for elm in ['symptomps','pofile_id','diseases']):
-            return JsonResponse({"message":"required details are not provided not provided"}, status=400)
-        ad = account_data.objects.get(user=user)
-        try:
-            pd = user_data.objects.get(id = data['pofile_id'])
-        except:
-            return JsonResponse({"message":"Invalid profile id"}, status=400)
-        if pd.account_id != user:
-            return JsonResponse({"message":"Current user cannot access this profile"}, status=400)
-        if date.today() > ad.enddate:
-            return JsonResponse({"message":"Your plan expired, please renew the plan"}, status=400)
-        if ad.report_check:
-            if not ad.reports_allowed:
-                ad.reports_allowed = ad.reports_allowed-1
-            else:
-                return JsonResponse({"message":"Your cannot make more reports, please renew the plan"}, status=400)
-        ad.report_count = ad.report_count + 1
-        pd.report_count = pd.report_count + 1
-        symptomps = ','.join(data['symptomps']
-        diseases = ','.join(data['diseases']
-        report = reports(user=user,profile=pd,symptomps=symptomps,diseases=diseases)
-        ar = False
+            nextsyms,disprobs,symlist = self.getprobs(results,skip=0)
+        res = {'Disease_probabilities':disprobs,'Next_questions':nextsyms,'Descriptions':self.getdescription(symlist,ar)}
+        return JsonResponse(res)
+
+#         return HttpResponse(list(data.keys()))
+#         return HttpResponse(models.Symptom.nodes.all())
+#         age = request.POST.get('age')
+#         gen = request.POST.get('gender')
+#         preg = request.POST.get('pregnancy')
+#         syms = request.POST.getlist('symtomps[]')
+
+
+class symsearch1(APIView):
+
+    def post(self, request, format=None):
+        data = request.data
+        if 'symptom' not in data.keys():
+            return JsonResponse({"message":"required parameters are not provided"}, status=400)
+        res = []
         if 'language' in data.keys():
             if data['language']!='ar':
                 return JsonResponse({"message":"Undefined Language"}, status=400)
-            ar = True
-        
-        return
+            with open('arlist.pkl', 'rb') as f:
+                symlist = pickle.load(f)
+        else:
+            with open('enlist.pkl', 'rb') as f:
+                symlist = pickle.load(f)
+        li = list(filter(lambda x: data['symptom'] in x, symlist))
+        for i in li:
+            res.append([i,symlist[i]])
+        return JsonResponse({"symptoms":res,"stop_disease_count":QA_STOP_DISEASE_COUNT,"stop_loop_count":QA_STOP_LOOP_COUNT})
+
+
+class getsymptom(APIView):
+    def post(self, request, format=None):
+        data = request.data
+        if 'symptom' not in data.keys():
+            return JsonResponse({"message":"required parameters are not provided"}, status=400)
+        params = {'sym':data['symptom']}
+        if 'language' in data.keys():
+            if data['language']!='ar':
+                return JsonResponse({"message":"Undefined Language"}, status=400)
+            results, meta = db.cypher_query("match (s:Symptom) where s.ar_name=$sym return s.ar_name,s.ar_description",params)
+        else:
+            results, meta = db.cypher_query("match (s:Symptom) where s.name=$sym return s.name,s.description",params)
+        return JsonResponse({"symptoms":results})
+
+
+#class symsearch(APIView):
+#    def post(self, request, format=None):
+#        data = request.data
+#        if 'symptom' not in data.keys():
+#            return JsonResponse({"message":"required parameters are not provided"}, status=400)
+#        params = {'sym':data['symptom']}
+#        if 'language' in data.keys():
+#            if data['language']!='ar':
+#                return JsonResponse({"message":"Undefined Language"}, status=400)
+#            results, meta = db.cypher_query("match (s:Symptom) where s.ar_name contains $sym return s.ar_name,s.ar_description",params)
+#        else:
+#            results, meta = db.cypher_query("match (s:Symptom) where s.name contains $sym return s.name,s.description",params)
+##         nextsyms,disprobs = self.getprobs(results)
+#        res = {'symptoms':results}
+#        return JsonResponse(res)
+
+
+def makesymsearch(request):
+    results, meta = db.cypher_query("match (s:Symptom) return s.name,s.ar_name,s.synonyms,s.ar_synonyms")
+    _ = pd.DataFrame(results,columns=['name','ar_name','synonyms','ar_synonyms'])
+    arlist ={}
+    enlist = {}
+    for index, row in _.iterrows():
+        if row['synonyms']:
+            for i in row['synonyms']:
+                enlist[i] = row['name']
+            enlist[row['name']] = row['name']
+        else:
+            enlist[row['name']] = row['name']
+        if row['ar_synonyms']:
+            for i in row['ar_synonyms']:
+                arlist[i] = row['ar_name']
+                arlist[row['ar_name']] = row['ar_name']
+        else:
+            arlist[row['ar_name']] = row['ar_name']
+    with open('enlist.pkl', 'wb') as f:
+        pickle.dump(enlist, f, pickle.HIGHEST_PROTOCOL)
+    with open('arlist.pkl', 'wb') as f:
+        pickle.dump(arlist, f, pickle.H

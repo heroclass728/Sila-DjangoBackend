@@ -199,40 +199,15 @@ def makesymsearch(request):
 class getreport(APIView):
     authentication_classes = [authentication.TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    def getdiseasesdata(diseases,ar):
-        if ar:
-            result, meta = db.cypher_query('match (s:Disease) where s.ar_name in $dislist return s.ar_name,s.ar_description',{'symlist':li})
-        else:
-            result, meta = db.cypher_query('match (s:Disease) where s.name in $dislist return s.name,s.description',{'symlist':li})
-        return result
     def post(self, request):
         user = request.user
-        data = json.load(request.body)
-        if not all(elm in list(data.keys()) for elm in ['symptomps','pofile_id','diseases']):
-            return JsonResponse({"message":"required details are not provided not provided"}, status=400)
         ad = account_data.objects.get(user=user)
-        try:
-            pd = user_data.objects.get(id = data['pofile_id'])
-        except:
-            return JsonResponse({"message":"Invalid profile id"}, status=400)
-        if pd.account_id != user:
-            return JsonResponse({"message":"Current user cannot access this profile"}, status=400)
-        if date.today() > ad.enddate:
-            return JsonResponse({"message":"Your plan expired, please renew the plan"}, status=400)
+        if date.today() > ad.date:
+            return JsonResponse({"message":"No more reports can be made, Date expired"}, status=400)
         if ad.report_check:
             if not ad.reports_allowed:
                 ad.reports_allowed = ad.reports_allowed-1
             else:
-                return JsonResponse({"message":"Your cannot make more reports, please renew the plan"}, status=400)
-        ad.report_count = ad.report_count + 1
-        pd.report_count = pd.report_count + 1
-        symptomps = ','.join(data['symptomps']
-        diseases = ','.join(data['diseases']
-        report = reports(user=user,profile=pd,symptomps=symptomps,diseases=diseases)
-        ar = False
-        if 'language' in data.keys():
-            if data['language']!='ar':
-                return JsonResponse({"message":"Undefined Language"}, status=400)
-            ar = True
+                return JsonResponse({"message":"No more reports can be made, reports count reached"}, status=400)
         
         return
