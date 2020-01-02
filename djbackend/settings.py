@@ -59,7 +59,7 @@ INSTALLED_APPS = [
     'coupons',
 ]
 
-# SITE_ID = 1 
+# SITE_ID = 1
 #ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -174,9 +174,12 @@ ACCOUNT_EMAIL_VERIFICATION = 'none' #"mandatory"'optional'
 ACCOUNT_EMAIL_CONFIRMATION_HMAC =False
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework.authentication.SessionAuthentication',
+#        'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
     ),
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny'
+   ],
     "DATE_INPUT_FORMATS": ["%d-%m-%Y"]
 }
 
@@ -207,7 +210,7 @@ AWS_SES_REGION_NAME = 'eu-west-1'
 AWS_SES_REGION_ENDPOINT = 'email.eu-west-1.amazonaws.com'
 
 
-#tinmce editor 
+#tinmce editor
 TINYMCE_DEFAULT_CONFIG = {
     'height': 360,
     'width': 1120,

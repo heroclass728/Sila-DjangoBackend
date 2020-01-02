@@ -34,4 +34,4 @@ class GetUserDetails(APIView):
             reports_allowed = ac.reports_allowed
         if ac.subuser_check:
             profiles_allowed = ac.subusers_allowed
-        return JsonResponse({ 'username': user.username,'email': user.email ,'account_id':user.id,'subscription_end_date':end_date,'reports_allowed':reports_allowed,'reports_count':ac.report_count,'profiles_allowed':profiles_allowed,'profiles_count':no_profile,'primary_profile':pprofile})
+        return JsonResponse({ 'username': user.username,'email': user.email ,'account_id':user.id,'subscription_end_date':end_date,'reports_allowed':reports_allowed,'plan_reports':ac.plan_reports,'reports_count':ac.report_count,'profiles_allowed':profiles_allowed,'plan_profiles':ac.plan_subusers,'profiles_count':no_profile,'primary_profile':pprofile,'first_name':user.first_name})

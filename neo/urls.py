@@ -9,4 +9,6 @@ urlpatterns = [
     path('symsearch/', views.symsearch1.as_view()),
     path('getsymptom/', views.getsymptom.as_view()),
     path('makesymsearch/', views.makesymsearch),
+    path('report/', views.getreport.as_view()),
+    path('getreport/', views.getreportsdata.as_view()),
 ]

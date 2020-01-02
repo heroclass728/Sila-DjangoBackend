@@ -1,3 +1,4 @@
+
 from django.shortcuts import render
 from django.http import HttpResponse
 # Create your views here.
@@ -9,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import authentication, permissions
 from django.http import JsonResponse
 import pickle
+from django.core.mail import send_mail
 
 
 
@@ -16,23 +18,20 @@ from . import models
 from . import serializers
 from neomodel import db
 from api.models import settings as apisettings
-from user.models import account_data,reports 
+from users.models import account_data,reports,user_data
 from collections import Counter
 import pandas as pd
 import json
 
 
 from users.models import CustomUser as user
+from datetime import date
 
+from ApiSettings import *
 
-QA_SYMPTOM_SEND = 10
-QA_DISEASE_SEND = 5
-QA_STOP_DISEASE_COUNT = 3
-QA_STOP_LOOP_COUNT = 15
-
-class Symptom(generics.ListCreateAPIView):
-    queryset = models.Symptom.nodes.all()
-    serializer_class = serializers.Symptom
+# class Symptom(generics.ListCreateAPIView):
+#     queryset = models.Symptom.nodes.all()
+#     serializer_class = serializers.Symptom
 
 
 class getsyms(APIView):
@@ -53,7 +52,7 @@ class userview(APIView):
             'auth': str(request.auth),  # None
         }
         return Response(content)
-
+#
 
 
 class qa(APIView):
@@ -102,7 +101,9 @@ class qa(APIView):
             results, meta = db.cypher_query(self.makequery_ar(data['symtomps']),params)
             ar=True
         else:
+
             results, meta = db.cypher_query(self.makequery(data['symtomps']),params)
+#            return JsonResponse({"message":"Inside the q&a system"}, status=400)
         if 'skip' in  data.keys():
             nextsyms,disprobs,symlist = self.getprobs(results,skip=data['skip'])
         else:
@@ -154,23 +155,23 @@ class getsymptom(APIView):
         return JsonResponse({"symptoms":results})
 
 
-#class symsearch(APIView):
-#    def post(self, request, format=None):
-#        data = request.data
-#        if 'symptom' not in data.keys():
-#            return JsonResponse({"message":"required parameters are not provided"}, status=400)
-#        params = {'sym':data['symptom']}
-#        if 'language' in data.keys():
-#            if data['language']!='ar':
-#                return JsonResponse({"message":"Undefined Language"}, status=400)
-#            results, meta = db.cypher_query("match (s:Symptom) where s.ar_name contains $sym return s.ar_name,s.ar_description",params)
-#        else:
-#            results, meta = db.cypher_query("match (s:Symptom) where s.name contains $sym return s.name,s.description",params)
-##         nextsyms,disprobs = self.getprobs(results)
-#        res = {'symptoms':results}
-#        return JsonResponse(res)
-
-
+# #class symsearch(APIView):
+# #    def post(self, request, format=None):
+# #        data = request.data
+# #        if 'symptom' not in data.keys():
+# #            return JsonResponse({"message":"required parameters are not provided"}, status=400)
+# #        params = {'sym':data['symptom']}
+# #        if 'language' in data.keys():
+# #            if data['language']!='ar':
+# #                return JsonResponse({"message":"Undefined Language"}, status=400)
+# #            results, meta = db.cypher_query("match (s:Symptom) where s.ar_name contains $sym return s.ar_name,s.ar_description",params)
+# #        else:
+# #            results, meta = db.cypher_query("match (s:Symptom) where s.name contains $sym return s.name,s.description",params)
+# ##         nextsyms,disprobs = self.getprobs(results)
+# #        res = {'symptoms':results}
+# #        return JsonResponse(res)
+#
+#
 def makesymsearch(request):
     results, meta = db.cypher_query("match (s:Symptom) return s.name,s.ar_name,s.synonyms,s.ar_synonyms")
     _ = pd.DataFrame(results,columns=['name','ar_name','synonyms','ar_synonyms'])
@@ -195,44 +196,149 @@ def makesymsearch(request):
         pickle.dump(arlist, f, pickle.HIGHEST_PROTOCOL)
     return HttpResponse('Successfully updated symptom serach')
 
+class getreportsdata(APIView):
+    authentication_classes = [authentication.TokenAuthentication]
+    def comstring(self,cs):
+        if cs<35:
+            st = CS_0_35
+        if cs>=35 and cs<=60:
+            st = CS_36_60
+        if cs >60:
+            st = CS_61_100
+        return st
+    permission_classes = [IsAuthenticated]
+    def put(self, request, format=None):
+        user = request.user
+        data = json.loads(request.body)
+        if "report_id" in data.keys():
+            try:
+                i = reports.objects.get(id = data['report_id'])
+            except:
+                return JsonResponse({"message":"Invalid report id"}, status=400)
+            if i.user!=user:
+                return JsonResponse({"message":"Current user cannot access this report"}, status=400)
+            return JsonResponse({"report_id":i.id,"profile_id":i.profile.id,"symptoms":i.symptomps,"diseases":i.diseases,"dangerscore":i.danger_score,"commonscore":i.common_score,"doctors":i.doctor,"danger_string":self.comstring(i.danger_score*100),"date":i.date})
+
+        if "profile_id" in data.keys():
+            try:
+                k = user_data.objects.get(id = data['profile_id'])
+            except:
+                return JsonResponse({"message":"Invalid profile id"}, status=400)
+            if k.account_id != user:
+                return JsonResponse({"message":"Current user cannot access this profile"}, status=400)
+            profilereports = reports.objects.filter(profile=k)
+            rlist = []
+            for i in profilereports:
+                rlist.append({'report_id':i.id,"profile_id":i.profile.id,"symptoms":i.symptomps,"diseases":i.diseases,"dangerscore":i.danger_score,"commonscore":i.common_score,"doctors":i.doctor,"danger_string":self.comstring(i.danger_score*100),"date":i.date})
+            return JsonResponse(rlist, safe=False)
+
+        rdata = reports.objects.filter(user = user)
+        plist = []
+        for i in rdata:
+            plist.append({'report_id':i.id,"profile_id":i.profile.id,"symptoms":i.symptomps,"diseases":i.diseases,"dangerscore":i.danger_score,"commonscore":i.common_score,"doctors":i.doctor,"danger_string":self.comstring(i.danger_score*100),"date":i.date})
+        return  JsonResponse(plist, safe=False)
+
 
 class getreport(APIView):
     authentication_classes = [authentication.TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    def getdiseasesdata(diseases,ar):
+    def getdiseasesdata(self,li,ar):
         if ar:
-            result, meta = db.cypher_query('match (s:Disease) where s.ar_name in $dislist return s.ar_name,s.ar_description',{'symlist':li})
+            result, meta = db.cypher_query('match (s:Disease) where s.ar_name in $dislist return s.ar_name,s.ar_description,s.common,s.urgent',{'dislist':li})
         else:
-            result, meta = db.cypher_query('match (s:Disease) where s.name in $dislist return s.name,s.description',{'symlist':li})
+            result, meta = db.cypher_query('match (s:Disease) where s.name in $dislist return s.name,s.description,s.common,s.urgent',{'dislist':li})
         return result
+    def getdoctordata(self,li,ar):
+        if ar:
+            result, meta = db.cypher_query('match (s:Disease) where s.ar_name in $dislist with s match (s)<-[:covers]-(d:Doctor) return d.ar_name',{'dislist':li})
+        else:
+            result, meta = db.cypher_query('match (s:Disease) where s.name in $dislist with s match (s)<-[:covers]-(d:Doctor) return d.name',{'dislist':li})
+        return result
+
+    def getscore(self,li,index):
+        dlist = []
+        for i in li:
+            dlist.append(int(list(i)[index]))
+        return sum(dlist)/len(dlist)
+
+    def comstring(self,cs):
+        if cs<35:
+            st = CS_0_35
+        if cs>=35 and cs<=60:
+            st = CS_36_60
+        if cs >60:
+            st = CS_61_100
+        return st
+    def comdecode(self,df,index):
+        for index,row in df.iterrows():
+            row['common'] = int(list(row['common'])[index])
+        return df
+
+    def put(self, request):
+        user = request.user
+        data = json.loads(request.body)
+        if not all(elm in list(data.keys()) for elm in ['profile_id','report_id','primary']):
+            return JsonResponse({"message":"required details are not provided not provided"}, status=400)
+        # ad = account_data.objects.get(user=user)
+        try:
+            profiledata = user_data.objects.get(id = data['profile_id'])
+        except:
+            return JsonResponse({"message":"Invalid profile id"}, status=400)
+        if profiledata.account_id != user:
+            return JsonResponse({"message":"Current user cannot access this profile"}, status=400)
+        try:
+            reportsdata = reports.objects.get(id = data['report_id'])
+        except:
+            return JsonResponse({"message":"Invalid report id"}, status=400)
+        if data['primary']:
+            send_mail('Test primary report mail','example mail','accounts@drsila.com',[profiledata.email],fail_silently=False)
+        else:
+            if profiledata.email==None:
+                if 'email' not in data.keys():
+                    return JsonResponse({"message":"This profile dose not have a email and it's not provided in data"}, status=400)
+                else:
+                    profiledata.email = data['email']
+                    profiledata.save()
+            send_mail('Test subyser report mail','example mail','accounts@drsila.com',[profiledata.email],fail_silently=False)
+        return JsonResponse({"message":"Email sent successfully"})
+
     def post(self, request):
         user = request.user
-        data = json.load(request.body)
-        if not all(elm in list(data.keys()) for elm in ['symptomps','pofile_id','diseases']):
+        data = json.loads(request.body)
+        if not all(elm in list(data.keys()) for elm in ['symptomps','profile_id','diseases','age_index']):
             return JsonResponse({"message":"required details are not provided not provided"}, status=400)
         ad = account_data.objects.get(user=user)
         try:
-            pd = user_data.objects.get(id = data['pofile_id'])
+            profiledata = user_data.objects.get(id = data['profile_id'])
         except:
             return JsonResponse({"message":"Invalid profile id"}, status=400)
-        if pd.account_id != user:
+        if profiledata.account_id != user:
             return JsonResponse({"message":"Current user cannot access this profile"}, status=400)
         if date.today() > ad.enddate:
             return JsonResponse({"message":"Your plan expired, please renew the plan"}, status=400)
         if ad.report_check:
-            if not ad.reports_allowed:
+            if ad.reports_allowed:
                 ad.reports_allowed = ad.reports_allowed-1
             else:
                 return JsonResponse({"message":"Your cannot make more reports, please renew the plan"}, status=400)
         ad.report_count = ad.report_count + 1
-        pd.report_count = pd.report_count + 1
-        symptomps = ','.join(data['symptomps']
-        diseases = ','.join(data['diseases']
-        report = reports(user=user,profile=pd,symptomps=symptomps,diseases=diseases)
+        profiledata.report_count = profiledata.report_count + 1
+        symptomps = ','.join(data['symptomps'])
+        diseases = ','.join(data['diseases'])
         ar = False
         if 'language' in data.keys():
             if data['language']!='ar':
                 return JsonResponse({"message":"Undefined Language"}, status=400)
             ar = True
-        
-        return
+        ndata = self.getdiseasesdata(data['diseases'],ar)
+        doctors  = self.getdoctordata(data['diseases'],ar)
+        df = pd.DataFrame(ndata,columns=['name','description','common','urgent'])
+        dangerscore = self.getscore(list(df.urgent.unique()),data['age_index'])
+        commonscore = self.getscore(list(df.common.unique()),data['age_index'])
+        df = self.comdecode(df,data['age_index'])
+        # for i in ndata
+        report = reports(user=user,profile=profiledata,symptomps=symptomps,diseases=diseases,danger_score=dangerscore,common_score=commonscore)
+        report.save()
+        ad.save()
+        profiledata.save()
+        return JsonResponse({"disease_data":df.drop(['urgent'], axis=1).values.tolist(),"danger_string":self.comstring(dangerscore*100),"danger_scrore":dangerscore*100,"report_id":report.id,"first_name":profiledata.name})

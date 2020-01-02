@@ -14,10 +14,10 @@ class templates(models.Model):
 
     def __str__(self):
         return self.name
-class content(models.Model):
-    name = models.ForeignKey(templates, on_delete=models.PROTECT)
-    text = models.TextField(max_length=250,null=True)
-#    draft = models.BooleanField(default=False)
+# class content(models.Model):
+#     name = models.ForeignKey(templates, on_delete=models.PROTECT)
+#     text = models.TextField(max_length=250,null=True)
+# #    draft = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
