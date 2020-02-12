@@ -232,7 +232,57 @@ def send_code(sender, **kwargs):
 #     rr = user.objects.get(email=email)
 #     models.account_data.objects.create(user=rr)
 #     return
+class User_password_change(APIView):
+    # authentication_classes = [authentication.TokenAuthentication]
+#    permission_classes = [permissions.IsAdminUser]
+    # permission_classes = [IsAuthenticated]
+    def post(self,request):
+        data = json.loads(request.body)
+        if not all(elm in list(data.keys()) for elm in ['email','password','code']):
+            return JsonResponse({"message":"Required Details are not provided"}, status=400)
+        try:
+            us =  user.objects.get(email=data['email'])
+        except:
+            return JsonResponse({"message":"Email not registered "}, status=403)
+        try:
+            scode =  cvc.objects.get(email=data['email'])
+        except:
+            return JsonResponse({"message":"This account holder did not ask for a password change"}, status=403)
+        if len(data['password'])==0:
+            return JsonResponse({"message":"Password cannot be empty"}, status=403)
+        if str(data['code']) == str(scode.code):
+            scode.delete()
+            us.set_password(data['password'])
+            us.save()
+            return JsonResponse({"message":"Password Changed sucessfully"},status=200)
+        else:
+            return JsonResponse({"message":"Code incorrect"}, status=403)
 
+    def get(self, request):
+        data = json.loads(request.body)
+        if 'email' not in data.keys():
+            return JsonResponse({"message":"No email in the request"}, status=400)
+        try:
+            us =  user.objects.get(email=data['email'])
+        except:
+            return JsonResponse({"message":"Email not registered"}, status=403)
+        if cvc.objects.filter(email=data['email']).exists():
+            cvrec = cvc.objects.get(email=data['email'])
+            code = cvrec.code
+        else:
+            code = randint(100000, 999999)
+            while cvc.objects.filter(code=code).exists():
+                code = code + 1
+            record = cvc(email=data['email'],code=code)
+            record.save()
+        htmlstr = etemplates.objects.get(name='code_verification').temp
+        htm_template = Template(htmlstr)
+        content = 'Thanks for using up for Dr. sila Please enter the following code to chnage your password'
+        context = Context({'code': code,'content':content,'username':us.username})
+        html_message = htm_template.render(context)
+        plain_message = strip_tags(html_message)
+        send_mail('Dr.Sila Password Chnage Code - {}'.format(code),plain_message,'accounts@drsila.com',[data['email']],html_message=html_message,fail_silently=False)
+        return JsonResponse({"message":"Email sent for changing password"}, status=200)
 
 
 def updatename(request):

@@ -11,6 +11,7 @@ from rest_framework import authentication, permissions
 from django.http import JsonResponse
 import pickle
 from django.core.mail import send_mail
+# from collections import Counter
 
 
 
@@ -26,7 +27,7 @@ import json
 
 from users.models import CustomUser as user
 from datetime import date
-
+import re
 from ApiSettings import *
 
 # class Symptom(generics.ListCreateAPIView):
@@ -134,7 +135,9 @@ class symsearch1(APIView):
         else:
             with open('enlist.pkl', 'rb') as f:
                 symlist = pickle.load(f)
-        li = list(filter(lambda x: data['symptom'] in x, symlist))
+        r = re.compile(".*"+data['symptom']+".*")
+        li = list(filter(r.match, symlist.keys()))
+#        li = list(filter(lambda x: data['symptom'] in x, symlist))
         for i in li:
             res.append([i,symlist[i]])
         return JsonResponse({"symptoms":res,"stop_disease_count":QA_STOP_DISEASE_COUNT,"stop_loop_count":QA_STOP_LOOP_COUNT})
@@ -187,17 +190,29 @@ def makesymsearch(request):
         if row['ar_synonyms']:
             for i in row['ar_synonyms']:
                 arlist[i] = row['ar_name']
-                arlist[row['ar_name']] = row['ar_name']
+            arlist[row['ar_name']] = row['ar_name']
         else:
             arlist[row['ar_name']] = row['ar_name']
     with open('enlist.pkl', 'wb') as f:
         pickle.dump(enlist, f, pickle.HIGHEST_PROTOCOL)
+
+    newarlist = arlist.copy()
+    for k, v in arlist.items():
+        if v is None:
+            del newarlist[k]
     with open('arlist.pkl', 'wb') as f:
-        pickle.dump(arlist, f, pickle.HIGHEST_PROTOCOL)
-    return HttpResponse('Successfully updated symptom serach')
+        pickle.dump(newarlist, f, pickle.HIGHEST_PROTOCOL)
+    return HttpResponse('Successfully updated symptom search')
 
 class getreportsdata(APIView):
     authentication_classes = [authentication.TokenAuthentication]
+    def getdiseasesdata(self,distr):
+        li = distr.split(',')
+        result, meta = db.cypher_query('match (s:Disease) where s.name in $dislist return s.name,s.description',{'dislist':li})
+        if len(result)==0:
+            result, meta = db.cypher_query('match (s:Disease) where s.ar_name in $dislist return s.ar_name',{'dislist':li})
+        res = pd.DataFrame(result,columns=['name','description'])
+        return res.values.tolist()
     def comstring(self,cs):
         if cs<35:
             st = CS_0_35
@@ -217,7 +232,7 @@ class getreportsdata(APIView):
                 return JsonResponse({"message":"Invalid report id"}, status=400)
             if i.user!=user:
                 return JsonResponse({"message":"Current user cannot access this report"}, status=400)
-            return JsonResponse({"report_id":i.id,"profile_id":i.profile.id,"symptoms":i.symptomps,"diseases":i.diseases,"dangerscore":i.danger_score,"commonscore":i.common_score,"doctors":i.doctor,"danger_string":self.comstring(i.danger_score*100),"date":i.date})
+            return JsonResponse({"report_id":i.id,"profile_id":i.profile.id,"symptoms":i.symptomps,"diseases":i.diseases,"description":self.getdiseasesdata(i.diseases),"dangerscore":i.danger_score,"commonscore":i.common_score,"doctors":i.doctor,"danger_string":self.comstring(i.danger_score),"date":i.date})
 
         if "profile_id" in data.keys():
             try:
@@ -229,13 +244,13 @@ class getreportsdata(APIView):
             profilereports = reports.objects.filter(profile=k)
             rlist = []
             for i in profilereports:
-                rlist.append({'report_id':i.id,"profile_id":i.profile.id,"symptoms":i.symptomps,"diseases":i.diseases,"dangerscore":i.danger_score,"commonscore":i.common_score,"doctors":i.doctor,"danger_string":self.comstring(i.danger_score*100),"date":i.date})
+                rlist.append({'report_id':i.id,"profile_id":i.profile.id,"symptoms":i.symptomps,"diseases":i.diseases,"description":self.getdiseasesdata(i.diseases),"dangerscore":i.danger_score,"commonscore":i.common_score,"doctors":i.doctor,"danger_string":self.comstring(i.danger_score),"date":i.date})
             return JsonResponse(rlist, safe=False)
 
         rdata = reports.objects.filter(user = user)
         plist = []
         for i in rdata:
-            plist.append({'report_id':i.id,"profile_id":i.profile.id,"symptoms":i.symptomps,"diseases":i.diseases,"dangerscore":i.danger_score,"commonscore":i.common_score,"doctors":i.doctor,"danger_string":self.comstring(i.danger_score*100),"date":i.date})
+            plist.append({'report_id':i.id,"profile_id":i.profile.id,"symptoms":i.symptomps,"diseases":i.diseases,"description":self.getdiseasesdata(i.diseases),"dangerscore":i.danger_score,"commonscore":i.common_score,"doctors":i.doctor,"danger_string":self.comstring(i.danger_score),"date":i.date})
         return  JsonResponse(plist, safe=False)
 
 
@@ -244,10 +259,11 @@ class getreport(APIView):
     permission_classes = [IsAuthenticated]
     def getdiseasesdata(self,li,ar):
         if ar:
-            result, meta = db.cypher_query('match (s:Disease) where s.ar_name in $dislist return s.ar_name,s.ar_description,s.common,s.urgent',{'dislist':li})
+            result, meta = db.cypher_query('match (s:Disease) where s.ar_name in $dislist return s.ar_name,s.ar_description, s.commom, s.urgent',{'dislist':li})
         else:
-            result, meta = db.cypher_query('match (s:Disease) where s.name in $dislist return s.name,s.description,s.common,s.urgent',{'dislist':li})
+            result, meta = db.cypher_query('match (s:Disease) where s.name in $dislist return s.name,s.description, s.common, s.urgent',{'dislist':li})
         return result
+
     def getdoctordata(self,li,ar):
         if ar:
             result, meta = db.cypher_query('match (s:Disease) where s.ar_name in $dislist with s match (s)<-[:covers]-(d:Doctor) return d.ar_name',{'dislist':li})
@@ -332,13 +348,21 @@ class getreport(APIView):
             ar = True
         ndata = self.getdiseasesdata(data['diseases'],ar)
         doctors  = self.getdoctordata(data['diseases'],ar)
+
+
+        drli = []
+        for i in doctors:
+            drstr = drli.append(i[0])
+        drocc = Counter(drli)
+        drstr = drocc.most_common(1)[0][0]
+
         df = pd.DataFrame(ndata,columns=['name','description','common','urgent'])
         dangerscore = self.getscore(list(df.urgent.unique()),data['age_index'])
         commonscore = self.getscore(list(df.common.unique()),data['age_index'])
         df = self.comdecode(df,data['age_index'])
         # for i in ndata
-        report = reports(user=user,profile=profiledata,symptomps=symptomps,diseases=diseases,danger_score=dangerscore,common_score=commonscore)
+        report = reports(user=user,profile=profiledata,symptomps=symptomps,diseases=diseases,danger_score=dangerscore*100,common_score=commonscore,doctor=drstr)
         report.save()
         ad.save()
         profiledata.save()
-        return JsonResponse({"disease_data":df.drop(['urgent'], axis=1).values.tolist(),"danger_string":self.comstring(dangerscore*100),"danger_scrore":dangerscore*100,"report_id":report.id,"first_name":profiledata.name})
+        return JsonResponse({"disease_data":df.drop(['urgent'], axis=1).values.tolist(),"danger_string":self.comstring(dangerscore*100),"danger_scrore":dangerscore*100,"report_id":report.id,"first_name":profiledata.name,"doctors":drstr})
