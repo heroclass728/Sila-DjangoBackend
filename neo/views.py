@@ -13,7 +13,7 @@ import pickle
 from django.core.mail import send_mail
 # from collections import Counter
 
-
+from django.utils.html import strip_tags
 
 from . import models
 from . import serializers
@@ -30,6 +30,9 @@ from datetime import date
 import re
 from ApiSettings import *
 
+
+from e_mails.models import templates as etemplates
+from django.template import Context, Template
 # class Symptom(generics.ListCreateAPIView):
 #     queryset = models.Symptom.nodes.all()
 #     serializer_class = serializers.Symptom
@@ -257,6 +260,15 @@ class getreportsdata(APIView):
 class getreport(APIView):
     authentication_classes = [authentication.TokenAuthentication]
     permission_classes = [IsAuthenticated]
+
+    def getdiseasesdataemail(self,distr):
+        li = distr.split(',')
+        result, meta = db.cypher_query('match (s:Disease) where s.name in $dislist return s.name,s.description,s.commom',{'dislist':li})
+        if len(result)==0:
+            result, meta = db.cypher_query('match (s:Disease) where s.ar_name in $dislist return s.ar_name,s.commom',{'dislist':li})
+        res = pd.DataFrame(result,columns=['name','description','common'])
+        return res
+
     def getdiseasesdata(self,li,ar):
         if ar:
             result, meta = db.cypher_query('match (s:Disease) where s.ar_name in $dislist return s.ar_name,s.ar_description, s.commom, s.urgent',{'dislist':li})
@@ -307,7 +319,15 @@ class getreport(APIView):
         except:
             return JsonResponse({"message":"Invalid report id"}, status=400)
         if data['primary']:
-            send_mail('Test primary report mail','example mail','accounts@drsila.com',[profiledata.email],fail_silently=False)
+            if 'ar' in data.keys():
+                if data['ar']:
+                    htmlstr = etemplates.objects.get(name='reports_primary_ar').temp
+                else:
+                    htmlstr = etemplates.objects.get(name='reports_primary').temp
+            else:
+                htmlstr = etemplates.objects.get(name='reports_primary').temp
+            email = user.email
+            # send_mail('Test primary report mail','example mail','accounts@drsila.com',[profiledata.email],fail_silently=False)
         else:
             if profiledata.email==None:
                 if 'email' not in data.keys():
@@ -315,7 +335,32 @@ class getreport(APIView):
                 else:
                     profiledata.email = data['email']
                     profiledata.save()
-            send_mail('Test subyser report mail','example mail','accounts@drsila.com',[profiledata.email],fail_silently=False)
+                    if 'ar' in data.keys():
+                        if data['ar']:
+                            htmlstr = etemplates.objects.get(name='reports_secondary_ar').temp
+                        else:
+                            htmlstr = etemplates.objects.get(name='reports_secondary').temp
+                    else:
+                        htmlstr = etemplates.objects.get(name='reports_secondary').temp
+
+            email = profiledata.email
+
+        pdf = self.getdiseasesdataemail(reportsdata.diseases)
+        diseases = []
+        for disname in reportsdata.diseases.split(','):
+            diseases.append({'disease':disname,
+                                 'common':pdf[pdf['name']==disname]['common'].values[0],
+                                 'description':pdf[pdf['name']==disname]['description'].values[0]
+                                })
+        htm_template = Template(htmlstr)
+        username = user.username
+        context = Context({'reportid': reportsdata.id,'reportdate':reportsdata.date,'username':username,'doctor':reportsdata.doctor,'dangerscore':self.comstring(reportsdata.danger_score),'diseases':diseases})
+        html_message = htm_template.render(context)
+        # etemplates.
+        # htmlstr = etemplates.objects.get(name='code_verification').temp
+        # html_message = render_to_string(htmlstr, {'code': code,'content':content,'username':username})
+        plain_message = strip_tags(html_message)
+        send_mail('Dr.Sila Report',plain_message,'reports@drsila.com',[email],html_message=html_message,fail_silently=False)
         return JsonResponse({"message":"Email sent successfully"})
 
     def post(self, request):

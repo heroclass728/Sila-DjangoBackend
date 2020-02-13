@@ -181,6 +181,7 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny'
    ],
     "DATE_INPUT_FORMATS": ["%d-%m-%Y"]
+#Place the throttling settings here and add a comma before
 }
 
 #rest_auth_config

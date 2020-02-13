@@ -3,7 +3,7 @@
 # Create your models here.
 from neomodel import (config, StructuredNode, StringProperty, IntegerProperty,
     UniqueIdProperty, RelationshipTo,ArrayProperty,BooleanProperty)
-config.DATABASE_URL = 'bolt://neo4j:9848022338@3.8.5.0:7687'
+config.DATABASE_URL = 'bolt://neo4j:Nael!((!))@172.31.20.71:7687'
 
 
 class Symptom(StructuredNode):
