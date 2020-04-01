@@ -95,24 +95,68 @@ WSGI_APPLICATION = 'djbackend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-            'ENGINE': 'djongo',
-            'ENFORCE_SCHEMA': True,
-            'NAME': 'djbackend',
-            'HOST': 'localhost',
-            'PORT': 27017,
-            'USER': 'djbackend',
-            'PASSWORD': 'U&4fuAmk',
-            'AUTH_SOURCE': 'djbackend',
-            'AUTH_MECHANISM': 'SCRAM-SHA-1',
+# DATABASES = {
+#     'default': {
+#             'ENGINE': 'djongo',
+#             'ENFORCE_SCHEMA': True,
+#             'NAME': 'djbackend',
+#             'HOST': 'localhost',
+#             'PORT': 27017,
+#             'USER': 'djbackend',
+#             'PASSWORD': 'U&4fuAmk',
+#             'AUTH_SOURCE': 'djbackend',
+#             'AUTH_MECHANISM': 'SCRAM-SHA-1',
 #            'REPLICASET': 'replicaset',
 #            'SSL': 'ssl',
 #            'SSL_CERTFILE': 'ssl_certfile',
 #            'SSL_CA_CERTS': 'ssl_ca_certs',
 #            'READ_PREFERENCE': 'read_preference'
-     }
-}
+#      }
+# }
+
+# DATABASES = {
+#     'default': {
+#             'ENGINE': 'djongo',
+#             'ENFORCE_SCHEMA': True,
+#             'NAME': 'djbackend',
+#             'HOST': 'localhost',
+#             'PORT': 27017,
+#             'USER': 'localhost',
+#             'PASSWORD': '',
+#             'AUTH_SOURCE': 'djbackend',
+#             'AUTH_MECHANISM': 'SCRAM-SHA-1',
+#            'REPLICASET': 'replicaset',
+#            'SSL': 'ssl',
+#            'SSL_CERTFILE': 'ssl_certfile',
+#            'SSL_CA_CERTS': 'ssl_ca_certs',
+#            'READ_PREFERENCE': 'read_preference'
+#      }
+# }
+
+DATABASES = {
+        'default': {
+            'ENGINE': 'djongo',
+            'ENFORCE_SCHEMA': True,
+            'LOGGING': {
+                'version': 1,
+                'loggers': {
+                    'djongo': {
+                        'level': 'DEBUG',
+                        'propogate': False,
+                    }
+                },
+             },
+            'NAME': 'djbackend',
+            'CLIENT': {
+                'host': 'localhost',
+                'port': 27017,
+                'username': 'localhost',
+                'password': '',
+                'authSource': 'djbackend',
+                'authMechanism': 'SCRAM-SHA-1'
+            }
+        }
+    }
 
 
 # Password validation
@@ -163,7 +207,7 @@ AUTHENTICATION_BACKENDS = (
 )
 
 REST_SESSION_LOGIN = True
-EMAIL_BACKEND =   'django_ses.SESBackend'  #'django.core.mail.backends.smtp.EmailBackend'  #'django.core.mail.backends.console.EmailBackend' #'django_ses.SESBackend' #'django_smtp_ssl.SSLEmailBackend'
+EMAIL_BACKEND = 'django_ses.SESBackend'  #'django.core.mail.backends.smtp.EmailBackend'  #'django.core.mail.backends.console.EmailBackend' #'django_ses.SESBackend' #'django_smtp_ssl.SSLEmailBackend'
 SITE_ID = 1
 
 ACCOUNT_EMAIL_REQUIRED = True

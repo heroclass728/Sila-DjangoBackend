@@ -60,13 +60,14 @@ class userview(APIView):
 
 
 class qa(APIView):
-    authentication_classes = [authentication.TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    # authentication_classes = [authentication.TokenAuthentication]
+    # permission_classes = [IsAuthenticated]
     def makequery_ar(self,sl):
         q = '''MATCH (u:User {group: $age, gender: $gen, pregnancy: $preg}) WITH u'''
         for i in range(len(sl)):
             q = q + ''' MATCH (:Symptom {ar_name: "'''+ sl[i] +'''"})<-[:has]-(d:Disease) WITH d'''
         q = q + ''' Match (d:Disease)-[:has]->(ps:Symptom) return d.ar_name , ps.ar_name'''
+        print("Query:"+q)
         return q
     def makequery(self,sl):
         q = '''MATCH (u:User {group: $age, gender: $gen, pregnancy: $preg}) WITH u'''
@@ -100,15 +101,14 @@ class qa(APIView):
             return JsonResponse({"message":"required parameters are not provided"}, status=400)
         params = {'age':data['age'],'gen':data['gender'],'preg':data['pregnancy']}
         if 'language' in data.keys():
-            if data['language']!='ar':
+            if data['language'] != 'ar':
                 return JsonResponse({"message":"Undefined Language"}, status=400)
             results, meta = db.cypher_query(self.makequery_ar(data['symtomps']),params)
             ar=True
         else:
-
             results, meta = db.cypher_query(self.makequery(data['symtomps']),params)
 #            return JsonResponse({"message":"Inside the q&a system"}, status=400)
-        if 'skip' in  data.keys():
+        if 'skip' in data.keys():
             nextsyms,disprobs,symlist = self.getprobs(results,skip=data['skip'])
         else:
             nextsyms,disprobs,symlist = self.getprobs(results,skip=0)
@@ -153,7 +153,7 @@ class getsymptom(APIView):
             return JsonResponse({"message":"required parameters are not provided"}, status=400)
         params = {'sym':data['symptom']}
         if 'language' in data.keys():
-            if data['language']!='ar':
+            if data['language'] != 'ar':
                 return JsonResponse({"message":"Undefined Language"}, status=400)
             results, meta = db.cypher_query("match (s:Symptom) where s.ar_name=$sym return s.ar_name,s.ar_description",params)
         else:
